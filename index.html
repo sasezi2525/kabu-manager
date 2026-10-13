@@ -81,13 +81,16 @@ function predict(a){
    const now=c.prices[i],before=c.prices[i-1];
    if(Number.isFinite(prices[i]))arrows.push('✓');
    else {
-    // Direction is inferred from the midpoint of each period's predicted range.
-    // Comparing non-overlapping ranges alone hides rises/falls when ranges overlap.
-    const midNow=(now.min+now.max)/2;
-    const midBefore=(before.min+before.max)/2;
-    const delta=midNow-midBefore;
-    const threshold=Math.max(3,midBefore*0.10);
-    arrows.push(delta>threshold?'↗':delta< -threshold?'↘':'→');
+    // GameWith-style conservative direction: if the current possible price
+    // includes the previous observed price, the direction is undetermined.
+    // Never call a range such as 91..142 a decline after an observed 132.
+    const threshold=1;
+    const previousObserved=Number.isFinite(prices[i-1])?prices[i-1]:null;
+    const referenceLow=previousObserved!==null?previousObserved:before.min;
+    const referenceHigh=previousObserved!==null?previousObserved:before.max;
+    const rising=now.min>referenceHigh+threshold;
+    const falling=now.max<referenceLow-threshold;
+    arrows.push(rising?'↗':falling?'↘':'→');
    }
   }
   const key=c.pattern_number+'|'+arrows.join('');
@@ -96,7 +99,7 @@ function predict(a){
   for(let j=0;j<12;j++){g.min[j]=Math.min(g.min[j],c.prices[j+2].min);g.max[j]=Math.max(g.max[j],c.prices[j+2].max)}
  }
  const ordered=[...groups.values()].sort((a,b)=>b.prob-a.prob);
- html+='<h3 style="margin:18px 0 7px">📊 予測ケース一覧</h3><p class="note">矢印は予測価格帯の中心値の変化から推定（↗上昇・↘下降・→大きな変化なし）。GameWithの矢印と完全一致するとは限りません。表は左右にスクロールできます。</p>';
+ html+='<h3 style="margin:18px 0 7px">📊 予測ケース一覧</h3><p class="note">矢印は直前の価格帯と重ならない場合のみ上昇・下降と判定（↗上昇・↘下降・→方向未確定）。GameWithの矢印と完全一致するとは限りません。表は左右にスクロールできます。</p>';
  html+='<div class="case-scroll"><table class="case-table"><thead><tr><th class="case-label">ケース / 確率</th>';
  for(let d=1;d<=6;d++)html+='<th colspan="2">'+names[d]+'曜</th>';
  html+='</tr><tr><th class="case-label">時間帯</th>';for(let i=0;i<12;i++)html+='<th>'+(i%2?'後':'前')+'</th>';html+='</tr></thead><tbody>';
@@ -121,7 +124,7 @@ function predict(a){
  }html+='</details>';
  html+='<details class="case-details"><summary>全ケースをまとめた時間帯別の予測範囲</summary><table class="forecast-table"><thead><tr><th>日時</th><th>最低</th><th>最高</th></tr></thead><tbody>';
  for(let i=2;i<14;i++){const r=summary.prices[i];if(r)html+='<tr><td>'+time(i)+(Number.isFinite(prices[i])?' ✓':'')+'</td><td>'+Math.round(r.min)+'</td><td>'+Math.round(r.max)+'</td></tr>'}
- html+='</tbody></table></details><p class="note">Turnip Prophetの予測候補に基づく表示です。矢印は予測範囲の中心値から算出する本アプリ独自の目安です。GameWithと同じ矢印・ケース数・確率になるとは限りません。</p>';
+ html+='</tbody></table></details><p class="note">Turnip Prophetの予測候補に基づく表示です。矢印は予測範囲の上下限から算出する本アプリ独自の目安です。GameWithと同じ矢印・ケース数・確率になるとは限りません。</p>';
  el.innerHTML=html;
 }
 
