@@ -1,4 +1,4 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#183f35"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><title>あつ森 カブ価管理</title><style>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#183f35"><link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=16"><link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=16"><link rel="manifest" href="./manifest.webmanifest?v=16"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><title>あつ森 カブ価管理</title><style>
 :root{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sans-serif;color:#213d33;background:#f4f7f2}*{box-sizing:border-box}body{margin:0}main{max-width:650px;margin:auto;padding:22px 16px 90px}header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}h1{font-size:23px;margin:0}small,.muted{color:#6d8075}h2{font-size:16px;margin:0 0 14px}.card{background:white;border:1px solid #e0e9df;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 3px 16px #203f2910}.week{display:flex;align-items:center;justify-content:space-between;gap:8px}.week strong{font-size:16px}.btn{border:0;border-radius:12px;background:#e7efe8;color:#1f4a39;padding:11px 14px;font-size:14px;font-weight:700;cursor:pointer}.btn.primary{background:#216e51;color:white}.btn:active{opacity:.75}.btn:disabled{opacity:.35}.summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#edf5ec;border-radius:13px;padding:14px}.metric b{display:block;font-size:24px;margin-top:6px;font-variant-numeric:tabular-nums}.metric span{font-size:12px;color:#60766a}.grid{display:grid;grid-template-columns:56px 1fr 1fr;gap:9px;align-items:center}.grid .head{text-align:center;color:#6a7b71;font-size:12px}.day{font-weight:700;font-size:14px}.price{width:100%;min-width:0;padding:12px 5px;border:1px solid #d6e2d6;border-radius:10px;text-align:center;font-size:18px;background:#fbfdfb;color:#203f32}.price:focus{outline:2px solid #64b68b;border-color:transparent}.disabled{background:#f1f2ef;color:#99a69b;border-radius:10px;text-align:center;padding:13px 2px;font-size:12px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.actions .btn{padding:13px 6px}.note{font-size:12px;color:#6b7c71;line-height:1.6}.chart{width:100%;height:210px;display:block}.forecast{display:grid;gap:9px}.forecast-row{padding:10px 12px;border:1px solid #e0e9df;border-radius:10px;background:#f8faf7}.forecast-row b{display:block;font-size:14px}.forecast-row small{display:block;margin-top:4px}.forecast-table{width:100%;border-collapse:collapse;font-size:12px}.forecast-table th,.forecast-table td{padding:8px 3px;border-bottom:1px solid #e6ece5;text-align:center}.forecast-table th:first-child{text-align:left}.warning{background:#fff8e9;padding:10px;border-radius:10px}pre{white-space:pre-wrap;font-size:13px;line-height:1.7;color:#3a5144;background:#f5f8f4;padding:14px;border-radius:12px;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.foot{display:flex;gap:8px;flex-wrap:wrap}.toast{position:fixed;bottom:25px;left:50%;transform:translateX(-50%);background:#193e31;color:white;border-radius:12px;padding:12px 18px;display:none;z-index:2;white-space:nowrap}input[type=file]{display:none}@media(max-width:370px){.card{padding:14px}.btn{font-size:12px;padding:10px}.grid{grid-template-columns:45px 1fr 1fr;gap:6px}}
 body.simple-mode{background:#fff1dc}body.simple-mode .card{background:#fffaf2;border-color:#e9d4b5}body.simple-mode .metric{background:#f9e7ca}body.simple-mode .price{background:#fffdf8}#connectionState{font-size:12px;font-weight:700;padding:7px 10px;border-radius:9px;background:#e5f3e8;color:#216e51;margin:8px 0;display:inline-block}body.simple-mode #connectionState{background:#f7d49d;color:#744500}
 .mode-switch{display:flex;gap:8px;margin-bottom:10px}.mode-switch .btn{flex:1}.mode-switch .btn.active{background:#205e49;color:white;border-color:#205e49}body.simple-mode .mode-switch .btn.active{background:#a96714;border-color:#a96714}body.simple-mode #connectionState{background:#f7d49d;color:#744500}</style><style>
@@ -85,11 +85,14 @@ function predict(a){
     // includes the previous observed price, the direction is undetermined.
     // Never call a range such as 91..142 a decline after an observed 132.
     const threshold=1;
-    const previousObserved=Number.isFinite(prices[i-1])?prices[i-1]:null;
-    const referenceLow=previousObserved!==null?previousObserved:before.min;
-    const referenceHigh=previousObserved!==null?previousObserved:before.max;
-    const rising=now.min>referenceHigh+threshold;
-    const falling=now.max<referenceLow-threshold;
+    // A single observed price inside a forecast interval is direction-unknown.
+    // For two forecast intervals, use both bounds' movement (Wed PM can rise
+    // even when its range narrowly overlaps Wed AM).
+    const prevIsPoint=before.min===before.max;
+    const rising=prevIsPoint ? now.min>before.max+threshold :
+      now.min>before.min+threshold && now.max>before.max+threshold;
+    const falling=prevIsPoint ? now.max<before.min-threshold :
+      now.min<before.min-threshold && now.max<before.max-threshold;
     arrows.push(rising?'↗':falling?'↘':'→');
    }
   }
@@ -99,7 +102,7 @@ function predict(a){
   for(let j=0;j<12;j++){g.min[j]=Math.min(g.min[j],c.prices[j+2].min);g.max[j]=Math.max(g.max[j],c.prices[j+2].max)}
  }
  const ordered=[...groups.values()].sort((a,b)=>b.prob-a.prob);
- html+='<h3 style="margin:18px 0 7px">📊 予測ケース一覧</h3><p class="note">矢印は直前の価格帯と重ならない場合のみ上昇・下降と判定（↗上昇・↘下降・→方向未確定）。GameWithの矢印と完全一致するとは限りません。表は左右にスクロールできます。</p>';
+ html+='<h3 style="margin:18px 0 7px">📊 予測ケース一覧</h3><p class="note">矢印は実測値と予測幅の重なり、および予測幅の上下限の動きを使って判定（↗上昇・↘下降・→方向未確定）。GameWithの矢印と完全一致するとは限りません。表は左右にスクロールできます。</p>';
  html+='<div class="case-scroll"><table class="case-table"><thead><tr><th class="case-label">ケース / 確率</th>';
  for(let d=1;d<=6;d++)html+='<th colspan="2">'+names[d]+'曜</th>';
  html+='</tr><tr><th class="case-label">時間帯</th>';for(let i=0;i<12;i++)html+='<th>'+(i%2?'後':'前')+'</th>';html+='</tr></thead><tbody>';
